@@ -1,3 +1,9 @@
+import subprocess
+import requests
+from telegram import Update
+from telegram.ext import ContextTypes
+
+# Fungsi utama
 async def mirror(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message or not update.message.reply_to_message.text:
         await update.message.reply_text("Reply ke pesan yang ada link ya!")
