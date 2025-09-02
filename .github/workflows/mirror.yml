@@ -1,15 +1,13 @@
-name: Mirror to GoFile
+name: Telegram Mirror Bot
 
 on:
+  push:
   workflow_dispatch:
-    inputs:
-      file_url:
-        description: 'Link file yang mau di-mirror'
-        required: true
-        default: 'https://example.com/file.zip'
+  schedule:
+    - cron: "0 */6 * * *" # restart tiap 6 jam biar gak mati
 
 jobs:
-  mirror:
+  run-bot:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repo
@@ -18,32 +16,12 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y curl jq
+          sudo apt-get install -y python3 python3-pip
+          pip3 install python-telegram-bot requests
 
-      - name: Download File
+      - name: Start Telegram Bot
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
         run: |
-          echo "📥 Downloading file..."
-          curl -L "${{ github.event.inputs.file_url }}" -o file.zip
-
-      - name: Get Best GoFile Server
-        id: get_server
-        run: |
-          echo "🔍 Getting best GoFile server..."
-          SERVER=$(curl -s https://api.gofile.io/servers | jq -r '.data.servers[0].name')
-          echo "SERVER=$SERVER" >> $GITHUB_ENV
-
-      - name: Upload to GoFile
-        id: upload
-        run: |
-          echo "📤 Uploading to GoFile server: $SERVER..."
-          RESPONSE=$(curl -s -X POST \
-            -F "file=@file.zip" \
-            https://$SERVER.gofile.io/uploadFile)
-          echo "Raw response: $RESPONSE"
-          DOWNLOAD_URL=$(echo $RESPONSE | jq -r '.data.downloadPage')
-          echo "DOWNLOAD_URL=$DOWNLOAD_URL" >> $GITHUB_ENV
-
-      - name: Show Result
-        run: |
-          echo "✅ File berhasil diupload ke GoFile:"
-          echo "🔗 ${DOWNLOAD_URL}"
+          echo "🚀 Starting Telegram Bot..."
+          python3 bot.py
