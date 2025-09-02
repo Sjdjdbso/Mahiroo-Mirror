@@ -1,4 +1,4 @@
-name: Mirror
+name: Mirror to GoFile
 
 on:
   workflow_dispatch:
@@ -25,19 +25,25 @@ jobs:
           echo "📥 Downloading file..."
           curl -L "${{ github.event.inputs.file_url }}" -o file.zip
 
-      - name: Upload to PixelDrain (Anonymous)
+      - name: Get Best GoFile Server
+        id: get_server
+        run: |
+          echo "🔍 Getting best GoFile server..."
+          SERVER=$(curl -s https://api.gofile.io/servers | jq -r '.data.servers[0].name')
+          echo "SERVER=$SERVER" >> $GITHUB_ENV
+
+      - name: Upload to GoFile
         id: upload
         run: |
-          echo "📤 Uploading anonymously to PixelDrain..."
+          echo "📤 Uploading to GoFile server: $SERVER..."
           RESPONSE=$(curl -s -X POST \
             -F "file=@file.zip" \
-            https://pixeldrain.com/api/file)
+            https://$SERVER.gofile.io/uploadFile)
           echo "Raw response: $RESPONSE"
-          FILE_ID=$(echo $RESPONSE | jq -r '.id')
-          echo "FILE_ID=$FILE_ID" >> $GITHUB_ENV
-          echo "PixelDrain URL: https://pixeldrain.com/u/$FILE_ID"
+          DOWNLOAD_URL=$(echo $RESPONSE | jq -r '.data.downloadPage')
+          echo "DOWNLOAD_URL=$DOWNLOAD_URL" >> $GITHUB_ENV
 
       - name: Show Result
         run: |
-          echo "✅ File berhasil diupload ke PixelDrain (Anonim):"
-          echo "🔗 https://pixeldrain.com/u/${FILE_ID}"
+          echo "✅ File berhasil diupload ke GoFile:"
+          echo "🔗 ${DOWNLOAD_URL}"
