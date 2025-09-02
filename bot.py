@@ -1,16 +1,17 @@
 import os
 import requests
-from telegram.ext import Updater, CommandHandler
+from telegram import Update
+from telegram.ext import Application, CommandHandler, ContextTypes
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 
-def mirror(update, context):
+async def mirror(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
-        update.message.reply_text("⚠️ Kasih link: /m <url>")
+        await update.message.reply_text("⚠️ Kasih link: /m <url>")
         return
 
     url = context.args[0]
-    update.message.reply_text(f"📥 Downloading: {url}")
+    await update.message.reply_text(f"📥 Downloading: {url}")
 
     # Tentukan nama file
     filename = url.split("/")[-1] or "downloaded_file"
@@ -28,16 +29,14 @@ def mirror(update, context):
     res = requests.post(f"https://{server}.gofile.io/uploadFile", files=files).json()
     if res["status"] == "ok":
         dl = res["data"]["downloadPage"]
-        update.message.reply_text(f"✅ Mirror Sukses!\n🔗 {dl}")
+        await update.message.reply_text(f"✅ Mirror Sukses!\n🔗 {dl}")
     else:
-        update.message.reply_text(f"❌ Gagal upload: {res}")
+        await update.message.reply_text(f"❌ Gagal upload: {res}")
 
 def main():
-    updater = Updater(TELEGRAM_TOKEN, use_context=True)
-    dp = updater.dispatcher
-    dp.add_handler(CommandHandler("m", mirror))
-    updater.start_polling()
-    updater.idle()
+    app = Application.builder().token(TELEGRAM_TOKEN).build()
+    app.add_handler(CommandHandler("m", mirror))
+    app.run_polling()
 
 if __name__ == "__main__":
     main()
