@@ -1,35 +1,100 @@
-from telegram import Update
-from telegram.ext import ContextTypes
+import os
 import requests
+import shutil
+import tarfile
+import zipfile
 import subprocess
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
+
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+GOFILE_API = "https://api.gofile.io"
+
+# Folder kerja
+DOWNLOAD_DIR = "downloads"
+EXTRACT_DIR = "extracted"
+
+os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+os.makedirs(EXTRACT_DIR, exist_ok=True)
+
+def clean_old_files():
+    shutil.rmtree(DOWNLOAD_DIR, ignore_errors=True)
+    shutil.rmtree(EXTRACT_DIR, ignore_errors=True)
+    os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+    os.makedirs(EXTRACT_DIR, exist_ok=True)
+
+def extract_file(filepath):
+    extracted_path = os.path.join(EXTRACT_DIR, os.path.splitext(os.path.basename(filepath))[0])
+    os.makedirs(extracted_path, exist_ok=True)
+
+    if filepath.endswith(".zip"):
+        with zipfile.ZipFile(filepath, 'r') as zip_ref:
+            zip_ref.extractall(extracted_path)
+    elif filepath.endswith(".tar.gz") or filepath.endswith(".tgz") or filepath.endswith(".tar"):
+        with tarfile.open(filepath, 'r:*') as tar_ref:
+            tar_ref.extractall(extracted_path)
+    else:
+        return None
+    return extracted_path
+
+def upload_to_gofile(filepath):
+    with open(filepath, 'rb') as f:
+        r = requests.post(f"{GOFILE_API}/uploadFile", files={"file": f})
+    return r.json()["data"]["downloadPage"]
 
 async def mirror(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message.reply_to_message or not update.message.reply_to_message.text:
-        await update.message.reply_text("Reply ke pesan yang ada link ya!")
+    if not context.args:
+        await update.message.reply_text("⚠️ Harap beri link!\nContoh: /m https://contoh.com/file.zip")
         return
 
-    url = update.message.reply_to_message.text.strip()
-    await update.message.reply_text(f"📥 Downloading via aria2c...\n`{url}`")
+    url = context.args[0]
+    await update.message.reply_text(f"⬇️ Downloading: {url}")
 
-    # Ambil nama file dari header Content-Disposition
-    head = requests.head(url, allow_redirects=True)
-    cd = head.headers.get("content-disposition")
-    if cd and "filename=" in cd:
-        filename = cd.split("filename=")[-1].strip('"')
-    else:
-        filename = url.split("/")[-1] or "downloaded_file"
+    clean_old_files()
 
-    # Download turbo pakai aria2c
-    subprocess.run(["aria2c", "-x", "16", "-s", "16", "-o", filename, url], check=True)
+    filename = os.path.join(DOWNLOAD_DIR, os.path.basename(url.split("?")[0]))
+    subprocess.run(["aria2c", "-x16", "-s16", "-o", os.path.basename(filename), "-d", DOWNLOAD_DIR, url], check=True)
 
-    # Upload ke GoFile
-    await update.message.reply_text("📤 Uploading to GoFile...")
-    files = {"file": open(filename, "rb")}
-    r = requests.post("https://store1.gofile.io/uploadFile", files=files)
-    res = r.json()
+    context.user_data["downloaded_file"] = filename
 
-    if res["status"] == "ok":
-        link = res["data"]["downloadPage"]
-        await update.message.reply_text(f"✅ Done! [Download]({link})", parse_mode="Markdown")
-    else:
-        await update.message.reply_text("❌ Upload gagal!")
+    # Kirim tombol pilihan
+    keyboard = [
+        [InlineKeyboardButton("📤 Upload Normal", callback_data="upload_normal")],
+        [InlineKeyboardButton("📂 Extract & Upload", callback_data="upload_extract")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(f"✅ File siap diupload: {os.path.basename(filename)}", reply_markup=reply_markup)
+
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    file_path = context.user_data.get("downloaded_file")
+    if not file_path:
+        await query.edit_message_text("⚠️ File tidak ditemukan. Ulangi /m <link>")
+        return
+
+    choice = query.data
+    target = file_path
+
+    if choice == "upload_extract":
+        await query.edit_message_text("📂 Mengekstrak file...")
+        extracted = extract_file(file_path)
+        if extracted:
+            shutil.make_archive(extracted, 'zip', extracted)
+            target = f"{extracted}.zip"
+
+    await query.edit_message_text("📤 Uploading ke GoFile...")
+    link = upload_to_gofile(target)
+
+    await query.edit_message_text(f"✅ Done!\n🔗 {link}")
+    clean_old_files()
+
+def main():
+    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    app.add_handler(CommandHandler("m", mirror))
+    app.add_handler(CallbackQueryHandler(button_handler))
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()

@@ -1,6 +1,7 @@
 name: Telegram Mirror Bot
 
 on:
+  push:
   workflow_dispatch:
   schedule:
     - cron: "0 */6 * * *"  # Restart tiap 6 jam
