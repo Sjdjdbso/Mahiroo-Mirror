@@ -4,7 +4,7 @@ import requests
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN") or "ISI_TOKEN_MU_DISINI"
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN") or "7720733633:AAEmRzuV9r7sdOXeVSQ-4rZ98mo3SW0yb20"
 
 async def mirror(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message or not update.message.reply_to_message.text:
