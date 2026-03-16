@@ -15,7 +15,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, Callb
 # ------------------------
 # Configuration & Globals
 # ------------------------
-TOKEN = os.getenv("TELEGRAM_TOKEN")
+TOKEN = os.getenv("7720733633:AAEmRzuV9r7sdOXeVSQ-4rZ98mo3SW0yb20")
 
 task_queue = asyncio.Queue()
 current_task = None
